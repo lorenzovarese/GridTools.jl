@@ -19,10 +19,12 @@ abstract type Dimension end
 # TODO: check for #dimension at compile time and not runtime
 # TODO: <: AbstractArray{T,N} is not needed... but then we have to define our own length and iterate function for Fields
 
+
 struct Field{T, N, T2 <: Tuple{Vararg{<:Dimension}}, T3 <: Tuple{Vararg{<:Dimension}}} <: AbstractArray{T,N}
     dims::T2
     data::Array{T,N}
     broadcast_dims::T3
+
     function Field(dims::T2, data::Array{T,N}, broadcast_dims::T3 = dims) where {T, N, T2 <: Tuple{Vararg{<:Dimension}}, T3 <: Tuple{Vararg{<:Dimension}}}
         @assert length(dims) == ndims(data)
         return new{T,N,T2,T3}(dims, data, broadcast_dims)
@@ -74,11 +76,19 @@ function broadcast(f::Field, b_dims::D)::Field where D <: Tuple{Vararg{<:Dimensi
 end
 
 
+
 @inbounds function where(mask::Field, a::Field, b::Field)::Field
     @assert size(mask.data) == size(a.data) == size(b.data)
     return Field(a.dims, ifelse.(mask.data, a.data, b.data))
 end
 
+"""
+    function where(mask::Field, t1::Tuple, t2::Tuple)
+        return map(x -> whereit(mask, x[1], x[2]), zip(t1, t2))
+    end
+
+Das da macht was
+"""
 function where(mask::Field, t1::Tuple, t2::Tuple)
     return map(x -> whereit(mask, x[1], x[2]), zip(t1, t2))
 end

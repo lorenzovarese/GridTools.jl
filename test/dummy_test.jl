@@ -65,7 +65,7 @@ C2E_offset_provider = Connectivity(edge_to_cell_table, (Edge, E2C), (Cell,), 2)
     @test isa(subtraction, Field)
     @test isa(mult, Field)
     @test isa(div, Field)
-	@test_throws DimensionMismatch (a .+ err)
+	@test_throws AssertionError (a .+ err)
 end
 
 @testset "Testset field_call" begin

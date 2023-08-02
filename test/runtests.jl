@@ -1,4 +1,4 @@
-using .GridTools
+using GridTools
 using Test
 
 @testset "GridTools tests" begin
