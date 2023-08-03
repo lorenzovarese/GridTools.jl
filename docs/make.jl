@@ -4,6 +4,7 @@ using Documenter
 using GridTools
 
 makedocs(
+    doctest = false
     sitename = "GridTools",
     format = Documenter.HTML(),
     modules = [GridTools]
@@ -13,16 +14,8 @@ makedocs(
 
 
 deploydocs(
-    repo = "github.com/jeffzwe/GridTools.jl",
+    repo = "github.com/jeffzwe/GridTools.jl.git",
 )
-
-
-# Documenter can also automatically deploy documentation to gh-pages.
-# See "Hosting Documentation" and deploydocs() in the Documenter manual
-# for more information.
-#=deploydocs(
-    repo = "<repository url>"
-)=#
 
 
 
