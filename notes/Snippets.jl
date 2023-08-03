@@ -1,27 +1,73 @@
 
+# User code exercises from gt4py intro #####################################################################
 
+struct Cell_ <: Dimension end
+struct K_ <: Dimension end
+struct Edge_ <: Dimension end
+struct E2C_ <: Dimension end
+Cell = Cell_()
+K = K_()
+Edge = Edge_()
+E2C = E2C_()
 
+function run_add(a::Field, b::Field)
+    temp = a + b
+    return b + temp
+end
 
-# Trying to do shit for broadcast #####################################################################
-
-
-function Base.size(F::Field)::Tuple
-    size_tup = [typemax(Int) for _ in 1:length(F.broadcast_dims)]
-    inds_real = findall(in.(F.broadcast_dims, Ref(F.dims)))
-    size_tup[inds_real] = [size(F.data)...]
-    return Tuple(size_tup)
+function nearest_cell_to_edge(cell_values::Field, e2c::Connectivity)
+    return cell_values(e2c(1))
 end
 
 
-@propagate_inbounds function Base.getindex(F::Field{T,N}, inds::Vararg{Int,N}) where {T,N}
-    inds_real = findall(in.(F.broadcast_dims, Ref(F.dims)))
-    F.data[inds[inds_real]...]
-    # F.data[inds...]
+function sum_adjacent_cells(cells::Field, e2c::Connectivity)
+    return neighbor_sum(cells(e2c()), axis=E2C)
 end
-@propagate_inbounds function Base.setindex!(F::Field{T,N}, val, inds::Vararg{Int,N}) where {T,N}
-    inds_real = findall(in.(F.broadcast_dims, Ref(F.dims)))
-    F.data[inds[inds_real]...] = val
-end
+
+
+a = Field((Cell, K), fill(2.0, (3,3)))
+b = Field((Cell, K), fill(3.0, (3,3)))
+c = Field((Cell, K), fill(5.0, (3,3)))
+
+result = Field((Cell, K), zeros(3,3))
+result = run_add(a, b)
+
+@printf "%f + %f = %f ± %f" 3.0 (2.0 + 3.0) mean(result) std(result)
+println()
+
+cell_values = Field((Cell,), [1.0, 1.0, 2.0, 3.0, 5.0, 8.0])
+
+edge_to_cell_table = [
+    [1  0];
+    [3  0];
+    [3  0];
+    [4  0];
+    [5  0];
+    [6  0];
+    [1  6];
+    [1  2];
+    [2  3];
+    [2  4];
+    [4  5];
+    [5  6]
+]
+
+cell_to_edge_table = [
+    [1   7   8];
+    [8   9  10];
+    [2   3   9];
+    [4  10  11];
+    [5  11  12];
+    [6   7  12]
+]
+
+E2C_offset_provider = Connectivity(edge_to_cell_table, (Cell,), (Edge, E2C), 2)
+
+edge_values = nearest_cell_to_edge(cell_values, E2C_offset_provider)
+println(edge_values)
+
+edge_values = sum_adjacent_cells(cell_values, E2C_offset_provider)
+println(edge_values.data)
 
 
 # where implementation with @generated #####################################################################
@@ -106,6 +152,27 @@ end
 
 # Snippets for custom broadcast ###############################################################################
 
+function custom_lt(x::Dimension, y::Dimension)
+
+    type_order = Dict{DataType, Int}(
+        Cell_ => 1,
+        K_ => 2,
+        Edge_ => 3,
+        E2C_ => 4
+    )
+    
+    # Compare based on type order
+    cmp = type_order[typeof(x)] - type_order[typeof(y)]
+    
+    # If the types are equal, maintain the original order
+    if cmp > 0
+        return false
+    else
+        return true
+    end
+end
+
+
 @inline function combine_axes(A::Tuple, B::Tuple)
     length(A[1]) > length(B[1]) ? (A,B) = (B,A) : nothing  # swap A and B       
 
@@ -115,13 +182,17 @@ end
         matching_dims = get_dim_ind(A[1], B[1])
         @assert A[2] == B[2][matching_dims] "Dimension Mismatch between the data Dimensions of the two Fields"
         return B
-    elseif isempty(intersect(A[1],B[1]))
+    elseif !isempty(intersect(A[1],B[1]))
         matching_dimsA = get_dim_ind(intersect(A[1],B[1]),A[1])
         matching_dimsB = get_dim_ind(intersect(A[1],B[1]),B[1])
         @assert A[2][matching_dimsA] == B[2][matching_dimsB] "Dimension Mismatch between the data Dimensions of the two Fields"
 
+        new_dims = [A[1]..., B[1]...]
+        new_axes = [A[2]..., B[2]...]
+        combine_tuple = hcat(new_dims, new_axes)
+        combine_tuple = unique(combine_tuple[sortperm(combine_tuple[:,1], lt=custom_lt),:],dims=1)
         
-        return (order(union(A[1],B[1])), )
+        return (tuple(combine_tuple[:,1]...), tuple(combine_tuple[:,2]...), union(A[3],B[3]))
     else
         error("Dimension Mismatch between the Dimensions of the two Fields")
     end
