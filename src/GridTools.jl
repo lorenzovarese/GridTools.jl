@@ -133,10 +133,11 @@ end
 @inline get_dim_ind(dims::Tuple{}, b_dims::Tuple) =  ()
 @inline get_dim_ind(dims::Tuple, b_dims::Tuple) = [findall(x -> x == dims[1], b_dims)[1] , get_dim_ind(Base.tail(dims), b_dims)...]
 
+
 # Checks dimension and broadcast combatibility of all fields
 @inline Base.axes(bc::Broadcasted{ArrayStyle{Field}}) =              combine_axes(bc.args...)
-@inline combine_axes(A::Field, bc::Broadcasted{ArrayStyle{Field}}) = combine_axes((A.dims, axes(A), A.broadcast_dims), axes(bc))
-@inline combine_axes(bc::Broadcasted{ArrayStyle{Field}}, B::Field) = combine_axes(axes(bc), (B.dims, axes(B), B.broadcast_dims))
+@inline _combine_axes(A::Field, bc::Broadcasted{ArrayStyle{Field}}) = combine_axes((A.dims, axes(A), A.broadcast_dims), axes(bc))
+@inline _combine_axes(bc::Broadcasted{ArrayStyle{Field}}, B::Field) = combine_axes(axes(bc), (B.dims, axes(B), B.broadcast_dims))
 @inline combine_axes(A::Field, B::Field) =                           combine_axes((A.dims, axes(A), A.broadcast_dims), (B.dims, axes(B), B.broadcast_dims))
 @inline combine_axes(A::Field, t::Tuple{}) = (A.dims, axes(A), A.broadcast_dims)
 @inline combine_axes(t::Tuple{}, A::Field) = (A.dims, axes(A), A.broadcast_dims)
