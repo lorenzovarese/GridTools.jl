@@ -28,14 +28,15 @@ jobs:
           - x64
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python_version }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}  # TODO(tehrengruber): cache?
+          python-version: ${{ matrix.python_version }}  # TODO(tehrengruber): cache?
       - name: Install GT4Py
         run: |
           git clone https://github.com/GridTools/gt4py.git
           cd gt4py
+          pip install -e requirements-dev.txt
           pip install .
       - uses: julia-actions/setup-julia@v1
         with:
