@@ -34,7 +34,7 @@ jobs:
           python-version: ${{ matrix.python-version }}  # TODO(tehrengruber): cache?
       - name: Install GT4Py
         run: |
-          git clone git@github.com:GridTools/gt4py.git
+          git clone https://github.com/GridTools/gt4py.git
           cd gt4py
           pip install .
       - uses: julia-actions/setup-julia@v1
