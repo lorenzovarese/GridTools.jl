@@ -1,4 +1,4 @@
-ENV["PYCALL_JL_RUNTIME_PYTHON"] = Sys.which("python3.10")
+# ENV["PYCALL_JL_RUNTIME_PYTHON"] = Sys.which("python3.10")
 # ENV["PYTHONBREAKPOINT"] = "pdb.set_trace"
 
 using PyCall
