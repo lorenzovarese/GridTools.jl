@@ -36,6 +36,7 @@ jobs:
         run: |
           git clone https://github.com/GridTools/gt4py.git
           cd gt4py
+          git checkout 91307b10e2ca1edb76a72cd8a3bebdd66898da60 # TODO(tehrengruber): remove
           pip install -r requirements-dev.txt
           pip install .
       - uses: julia-actions/setup-julia@v1
