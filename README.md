@@ -19,7 +19,8 @@ python -m venv venv
 #  this command has be run everytime GridTools.jl is used
 source venv/bin/activate
 # clone gt4py
-git clone git@github.com:GridTools/gt4py.git $GT4PY_PATH
+git clone --branch fix_python_interp_path_in_cmake git@github.com:tehrengruber/gt4py.git
+#git clone git@github.com:GridTools/gt4py.git $GT4PY_PATH
 pip install -r $GT4PY_PATH/requirements-dev.txt
 pip install -e $GT4PY_PATH
 # 
