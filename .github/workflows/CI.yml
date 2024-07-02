@@ -32,6 +32,8 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python_version }}  # TODO(tehrengruber): cache?
+      - name: Install boost
+        run: apt install libboost-all-dev
       - name: Install GT4Py
         run: |
           #git clone https://github.com/GridTools/gt4py.git
