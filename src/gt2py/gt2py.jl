@@ -54,11 +54,32 @@ function __init__()
     copy!(type_translation, pyimport("gt4py.next.type_system.type_translation"))
     copy!(dialect_ast_enums, pyimport("gt4py.next.ffront.dialect_ast_enums"))
     copy!(fbuiltins, pyimport("gt4py.next.ffront.fbuiltins"))
-    copy!(ClosureVarFolding, pyimport("gt4py.next.ffront.foast_passes.closure_var_folding").ClosureVarFolding)
-    copy!(ClosureVarTypeDeduction, pyimport("gt4py.next.ffront.foast_passes.closure_var_type_deduction").ClosureVarTypeDeduction)
-    copy!(DeadClosureVarElimination, pyimport("gt4py.next.ffront.foast_passes.dead_closure_var_elimination").DeadClosureVarElimination)
-    copy!(UnpackedAssignPass, pyimport("gt4py.next.ffront.foast_passes.iterable_unpack").UnpackedAssignPass)
-    copy!(FieldOperatorTypeDeduction, pyimport("gt4py.next.ffront.foast_passes.type_deduction").FieldOperatorTypeDeduction)
+    copy!(
+        ClosureVarFolding,
+        pyimport("gt4py.next.ffront.foast_passes.closure_var_folding").ClosureVarFolding
+    )
+    copy!(
+        ClosureVarTypeDeduction,
+        pyimport(
+            "gt4py.next.ffront.foast_passes.closure_var_type_deduction"
+        ).ClosureVarTypeDeduction
+    )
+    copy!(
+        DeadClosureVarElimination,
+        pyimport(
+            "gt4py.next.ffront.foast_passes.dead_closure_var_elimination"
+        ).DeadClosureVarElimination
+    )
+    copy!(
+        UnpackedAssignPass,
+        pyimport("gt4py.next.ffront.foast_passes.iterable_unpack").UnpackedAssignPass
+    )
+    copy!(
+        FieldOperatorTypeDeduction,
+        pyimport(
+            "gt4py.next.ffront.foast_passes.type_deduction"
+        ).FieldOperatorTypeDeduction
+    )
     copy!(FieldOperator, pyimport("gt4py.next.ffront.decorator").FieldOperator)
     copy!(roundtrip, pyimport("gt4py.next.program_processors.runners.roundtrip"))
     copy!(gtfn_cpu, pyimport("gt4py.next.program_processors.runners.gtfn"))
@@ -74,7 +95,28 @@ include("jast_to_foast.jl")
 
 # Utils ------------------------------------------------------------------------------------
 
-bin_op = Set([:(+), :(-), :(*), :(/), :(÷), :(^), :(%), :(&), :(|), :(⊻), :.+, :.-, :.*, :./, :.÷, :.^, :.%, :.&, :.|, :.⊻])
+bin_op = Set([
+    :(+),
+    :(-),
+    :(*),
+    :(/),
+    :(÷),
+    :(^),
+    :(%),
+    :(&),
+    :(|),
+    :(⊻),
+    :.+,
+    :.-,
+    :.*,
+    :./,
+    :.÷,
+    :.^,
+    :.%,
+    :.&,
+    :.|,
+    :.⊻
+])
 unary_op = Set([:(!), :(~), :.!, :.~, :(:)])
 comp_op = Set([:(==), :(!=), :(<), :(<=), :(>), :(>=), :.==, :.!=, :.<, :.<=, :.>, :.>=])
 
@@ -83,8 +125,8 @@ math_ops = union(bin_op, unary_op, comp_op)
 disallowed_op = Set([:hcat, :vcat, :concat]) #TODO: Link concat as soon as it's implemented in gt4py. Add further "forbidden" operations
 
 builtin_op = Dict(
-    :max_over => max_over, 
-    :min_over => min_over, 
+    :max_over => max_over,
+    :min_over => min_over,
     :broadcast => GridTools.broadcast,
     :where => GridTools.where,
     :neighbor_sum => neighbor_sum,
@@ -120,13 +162,18 @@ builtin_op = Dict(
     :max => max,
     Symbol("@bp") => nothing,
     Symbol("@run") => nothing
-    )
+)
 
 CLOSURE_VARS::Dict = Dict()
 
 # Methods -----------------------------------------------------------------------------------
 
-function py_field_operator(fo, backend = Nothing, grid_type = py"None"o, operator_attributes = Dict())
+function py_field_operator(
+    fo,
+    backend = Nothing,
+    grid_type = py"None"o,
+    operator_attributes = Dict()
+)
     if backend == Nothing
         backend = py_backends["gpu"]
     end
@@ -135,25 +182,28 @@ function py_field_operator(fo, backend = Nothing, grid_type = py"None"o, operato
     loc = foast_definition_node.location
 
     operator_attribute_nodes = Dict(
-        key => foast.Constant(value=value, type=type_translation.from_value(value), location=loc)
-        for (key, value) in operator_attributes
+        key => foast.Constant(
+            value = value,
+            type = type_translation.from_value(value),
+            location = loc
+        ) for (key, value) in operator_attributes
     )
 
     untyped_foast_node = foast.FieldOperator(
-        id=(foast_definition_node.id),
-        definition=(foast_definition_node),
-        location=loc
-        ;operator_attribute_nodes...
+        id = (foast_definition_node.id),
+        definition = (foast_definition_node),
+        location = loc;
+        operator_attribute_nodes...
     )
 
     foast_node = FieldOperatorTypeDeduction.apply(untyped_foast_node)
 
     return FieldOperator(
-        foast_node=foast_node,
-        closure_vars=closure_vars,
-        definition=py"None"o,
-        backend=backend,
-        grid_type=grid_type,
+        foast_node = foast_node,
+        closure_vars = closure_vars,
+        definition = py"None"o,
+        backend = backend,
+        grid_type = grid_type,
     )
 end
 
@@ -183,13 +233,16 @@ function postprocess_definition(foast_node, closure_vars, annotations)
 
     if haskey(annotations, "return")
         annotated_return_type = annotations["return"]
-        @assert annotated_return_type == foast_node.type.returns  ("Annotated return type does not match deduced return type. Expected $(foast_node.type.returns), but got $annotated_return_type.")
+        @assert annotated_return_type == foast_node.type.returns (
+            "Annotated return type does not match deduced return type. Expected $(foast_node.type.returns), but got $annotated_return_type."
+        )
     end
 
     return foast_node
 end
 
-py_args(args::Union{Base.Pairs, Dict}) = Dict(i.first => convert_type(i.second) for i in args)
+py_args(args::Union{Base.Pairs, Dict}) =
+    Dict(i.first => convert_type(i.second) for i in args)
 py_args(args::Tuple) = [convert_type(arg) for arg in args]
 py_args(arg) = convert_type(arg)
 py_args(n::Nothing) = nothing
@@ -213,30 +266,37 @@ function convert_type(a::Field)
     offset = Dict(convert_type(dim) => a.origin[i] for (i, dim) in enumerate(a.dims))
 
     # py_field = gtx.as_field(b_dims, a.data, origin = offset)      #TODO: as_field copies the data. This effects performance and the data returned in out. 
-    py_field = gtx.np_as_located_field(b_dims..., origin=offset)(new_data)
+    py_field = gtx.np_as_located_field(b_dims..., origin = offset)(new_data)
 
     return py_field
 end
 
 function convert_type(a::Connectivity)
     source_kind = py_dim_kind[(get_dim_kind(a.source))]
-    source_dim  = gtx.Dimension(get_dim_name(a.source), kind=source_kind)
-    
+    source_dim = gtx.Dimension(get_dim_name(a.source), kind = source_kind)
+
     target_kind = py_dim_kind[(get_dim_kind(a.target))]
-    target_dim = gtx.Dimension(get_dim_name(a.target), kind=target_kind)
+    target_dim = gtx.Dimension(get_dim_name(a.target), kind = target_kind)
 
     @assert typeof(a.data) <: Array "Use concrete types for the data Array of the following Connectivity: $a."
 
     # account for different indexing in python
-    return gtx.NeighborTableOffsetProvider(ifelse.(a.data .!= -1, a.data .- 1, a.data), target_dim, source_dim, a.dims)
+    return gtx.NeighborTableOffsetProvider(
+        ifelse.(a.data .!= -1, a.data .- 1, a.data),
+        target_dim,
+        source_dim,
+        a.dims
+    )
 end
 
 function convert_type(a::Dimension)
-    return gtx.Dimension(get_dim_name(a), kind=py_dim_kind[get_dim_kind(a)])
+    return gtx.Dimension(get_dim_name(a), kind = py_dim_kind[get_dim_kind(a)])
 end
 
 function convert_type(a::Any)
-    @assert Symbol(typeof(a)) in keys(scalar_types) ("The type of argument $(a) is not a valid argument type to a field operator.")
+    @assert Symbol(typeof(a)) in keys(scalar_types) (
+        "The type of argument $(a) is not a valid argument type to a field operator."
+    )
     return a
 end
 
@@ -279,7 +339,7 @@ end
 # Init helper ------------------------------------------------------------------------------
 
 function init_py_utils()
-    
+
     scalar_types_init = Dict(
         :Bool => ts.ScalarKind."BOOL",
         :Int32 => ts.ScalarKind."INT32",
@@ -295,14 +355,14 @@ function init_py_utils()
     )
 
     py_scalar_types_init = Dict(
-    Bool => py"bool",
-    Int32 => np.int32,
-    Int64 => np.int64,
-    Int => np.int64,
-    Integer => np.int64,
-    Float32 => np.float32,
-    Float64 => np.float64,
-    AbstractFloat => np.float64,
+        Bool => py"bool",
+        Int32 => np.int32,
+        Int64 => np.int64,
+        Int => np.int64,
+        Integer => np.int64,
+        Float32 => np.float32,
+        Float64 => np.float64,
+        AbstractFloat => np.float64,
     )
 
     py_dim_kind_init = Dict(
@@ -313,54 +373,58 @@ function init_py_utils()
     )
 
     builtin_py_op_init = Dict(
-    :max_over => gtx.max_over, 
-    :min_over => gtx.min_over, 
-    :broadcast => gtx.broadcast,
-    :where => gtx.where,
-    :neighbor_sum => gtx.neighbor_sum,
-    :convert => gtx.astype,
-    # :as_offset => gtx.as_offset,
-    :pi => np.pi,
-    :sin => gtx.sin,
-    :cos => gtx.cos,
-    :tan => gtx.tan,
-    :asin => gtx.arcsin,
-    :acos => gtx.arccos,
-    :atan => gtx.arctan,
-    :sinh => gtx.sinh,
-    :cosh => gtx.cosh,
-    :tanh => gtx.tanh,
-    :asinh => gtx.arcsinh,
-    :acosh => gtx.arccosh,
-    :atanh => gtx.arctanh,
-    :sqrt => gtx.sqrt,
-    :exp => gtx.exp,
-    :log => gtx.log,
-    :gamma => gtx.gamma,
-    :cbrt => gtx.cbrt,
-    :floor => gtx.floor,
-    :ceil => gtx.ceil,
-    :trunc => gtx.trunc,
-    :abs => gtx.abs,
-    :isfinite => gtx.isfinite,
-    :isinf => gtx.isinf,
-    :isnan => gtx.isnan,
-    :min => gtx.minimum,
-    :max => gtx.maximum
+        :max_over => gtx.max_over,
+        :min_over => gtx.min_over,
+        :broadcast => gtx.broadcast,
+        :where => gtx.where,
+        :neighbor_sum => gtx.neighbor_sum,
+        :convert => gtx.astype,
+        # :as_offset => gtx.as_offset,
+        :pi => np.pi,
+        :sin => gtx.sin,
+        :cos => gtx.cos,
+        :tan => gtx.tan,
+        :asin => gtx.arcsin,
+        :acos => gtx.arccos,
+        :atan => gtx.arctan,
+        :sinh => gtx.sinh,
+        :cosh => gtx.cosh,
+        :tanh => gtx.tanh,
+        :asinh => gtx.arcsinh,
+        :acosh => gtx.arccosh,
+        :atanh => gtx.arctanh,
+        :sqrt => gtx.sqrt,
+        :exp => gtx.exp,
+        :log => gtx.log,
+        :gamma => gtx.gamma,
+        :cbrt => gtx.cbrt,
+        :floor => gtx.floor,
+        :ceil => gtx.ceil,
+        :trunc => gtx.trunc,
+        :abs => gtx.abs,
+        :isfinite => gtx.isfinite,
+        :isinf => gtx.isinf,
+        :isnan => gtx.isnan,
+        :min => gtx.minimum,
+        :max => gtx.maximum
     )
 
     py_backends_init = Dict(
         "cpu" => roundtrip.executor,
         "gpu" => gtfn_cpu.otf_compile_executor.CachedOTFCompileExecutor(
-                    name="run_gtfn_cached_cmake",
-                    otf_workflow=gtfn_cpu.workflow.CachedStep(step=gtfn_cpu.run_gtfn.executor.otf_workflow.replace(
-                        compilation=gtfn_cpu.compiler.Compiler(
-                            cache_strategy=gtfn_cpu.cache.Strategy.PERSISTENT,
-                            builder_factory=cmake.CMakeFactory(cmake_build_type=cmake.BuildType.RELEASE)
-                            )
-                        ),
-                    hash_function=gtfn_cpu.compilation_hash),
-                )
+            name = "run_gtfn_cached_cmake",
+            otf_workflow = gtfn_cpu.workflow.CachedStep(
+                step = gtfn_cpu.run_gtfn.executor.otf_workflow.replace(
+                    compilation = gtfn_cpu.compiler.Compiler(
+                        cache_strategy = gtfn_cpu.cache.Strategy.PERSISTENT,
+                        builder_factory = cmake.CMakeFactory(
+                            cmake_build_type = cmake.BuildType.RELEASE
+                        )
+                    )
+                ),
+                hash_function = gtfn_cpu.compilation_hash
+            ),
+        )
     )
 
     copy!(scalar_types, scalar_types_init)

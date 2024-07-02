@@ -1,6 +1,11 @@
 Base.BroadcastStyle(::Type{<:Field}) = Broadcast.ArrayStyle{Field}()
 
-struct FieldShape{N, Dim <: NTuple{N, Dimension}, Ax <:  NTuple{N, UnitRange{Int64}}, B_Dim <: Tuple{Vararg{Dimension}}}
+struct FieldShape{
+    N,
+    Dim <: NTuple{N, Dimension},
+    Ax <: NTuple{N, UnitRange{Int64}},
+    B_Dim <: Tuple{Vararg{Dimension}}
+}
     dims::Dim
     axes::Ax
     broadcast_dims::B_Dim
@@ -18,8 +23,10 @@ end
 # Custom copy() that only allows for concrete types
 @inline function Base.Broadcast.copy(bc::Broadcasted{ArrayStyle{Field}})
     ElType = Base.Broadcast.combine_eltypes(bc.f, bc.args)
-    @assert Base.isconcretetype(ElType) ("Field-broadcasting at the moment only supports concrete types")
-        # We can trust it and defer to the simpler `copyto!`
+    @assert Base.isconcretetype(ElType) (
+        "Field-broadcasting at the moment only supports concrete types"
+    )
+    # We can trust it and defer to the simpler `copyto!`
     return copyto!(similar(bc, ElType), bc)
 end
 
@@ -31,20 +38,22 @@ end
 # Dimension check and calculation of output dimension -----------------------------------------------------------------------------------------------------------------------------------------
 
 # Checks if dimension has been calculated. If not calculates new dimensions
-@inline Base.axes(bc::Broadcasted{ArrayStyle{Field}}) =     f_axes(bc, bc.axes)
-f_axes(::Broadcasted, shape::FieldShape) =                  shape.axes
-@inline f_axes(bc::Broadcasted, ::Nothing)  =               combine_axes(bc.f, bc.args...)
+@inline Base.axes(bc::Broadcasted{ArrayStyle{Field}}) = f_axes(bc, bc.axes)
+f_axes(::Broadcasted, shape::FieldShape) = shape.axes
+@inline f_axes(bc::Broadcasted, ::Nothing) = combine_axes(bc.f, bc.args...)
 
 # Checks if a Dimension Tuple is exists in the same order in another Dimension Tuple 
 function ordered_subset(A::Tuple{Vararg{Dimension}}, B::Tuple{Vararg{Dimension}})
-    if isempty(A) || isempty(B) return false end
+    if isempty(A) || isempty(B)
+        return false
+    end
 
     i, j = 1, 1
     while i <= length(A) && j <= length(B)
         if A[i] == B[j]
-            i += 1 
+            i += 1
         end
-        j += 1  
+        j += 1
     end
 
     return i > length(A)
@@ -57,12 +66,16 @@ function get_size_ifelse(mask::FieldShape, branch::FieldShape)
     ind_out = findall(x -> x in mask.dims, branch.dims)
 
     out_size[ind_out] .= mask.axes[ind_mask]
-    
+
     return FieldShape(branch.dims, Tuple(out_size), branch.broadcast_dims)
 end
 
 # Calculates output size for all other functions
-@inline function get_size(out_dims::NTuple{N, Dimension}, A::FieldShape, B::FieldShape)::NTuple{N, UnitRange{Int64}} where {N}
+@inline function get_size(
+    out_dims::NTuple{N, Dimension},
+    A::FieldShape,
+    B::FieldShape
+)::NTuple{N, UnitRange{Int64}} where {N}
     out_size = ()
 
     if isempty(A.axes)
@@ -90,7 +103,10 @@ end
     return out_size
 end
 
-function promote_dims(dims_A::Tuple{Vararg{Dimension}}, dims_B::Tuple{Vararg{Dimension}})::Tuple{Vararg{Dimension}}
+function promote_dims(
+    dims_A::Tuple{Vararg{Dimension}},
+    dims_B::Tuple{Vararg{Dimension}}
+)::Tuple{Vararg{Dimension}}
     # TODO: copy documentation from GT4Py
     dims_list = [dims_A, dims_B]
 
@@ -181,12 +197,15 @@ end
     end
 end
 
-@inline combine_axes(f::Function, arg1, arg2, rest...)            = combine_axes(f, combine_axes(f, format(arg1), format(arg2)), rest...)
-@inline combine_axes(f::Function, arg, n::Nothing)                = combine_axes(f, format(arg))
-@inline combine_axes(f::Function, n::Nothing, arg)                = combine_axes(f, format(arg))
-@inline combine_axes(f::Function, arg)                            = format(arg)
-@inline combine_axes(f::Function, shape::FieldShape, t0::Tuple{}) = combine_axes(f, format(shape))
-@inline combine_axes(f::Function, t0::Tuple{}, shape::FieldShape) = combine_axes(f, format(shape))
+@inline combine_axes(f::Function, arg1, arg2, rest...) =
+    combine_axes(f, combine_axes(f, format(arg1), format(arg2)), rest...)
+@inline combine_axes(f::Function, arg, n::Nothing) = combine_axes(f, format(arg))
+@inline combine_axes(f::Function, n::Nothing, arg) = combine_axes(f, format(arg))
+@inline combine_axes(f::Function, arg) = format(arg)
+@inline combine_axes(f::Function, shape::FieldShape, t0::Tuple{}) =
+    combine_axes(f, format(shape))
+@inline combine_axes(f::Function, t0::Tuple{}, shape::FieldShape) =
+    combine_axes(f, format(shape))
 
 @inline function combine_axes(f::Function, A::FieldShape, B::FieldShape)::FieldShape
 
@@ -210,9 +229,14 @@ end
 # -----------------------------------------------------------------------------------------------------------------------------------------
 
 # Creates uninitialized output object
-function Base.similar(bc::Broadcasted{ArrayStyle{Field}}, ::Type{ElType}) where ElType
+function Base.similar(bc::Broadcasted{ArrayStyle{Field}}, ::Type{ElType}) where {ElType}
     offsets = getproperty.(axes(bc), :start) .- 1
-    Field(bc.axes.dims, similar(Array{ElType}, getproperty.(axes(bc), :stop) .- offsets), bc.axes.broadcast_dims, offsets)
+    Field(
+        bc.axes.dims,
+        similar(Array{ElType}, getproperty.(axes(bc), :stop) .- offsets),
+        bc.axes.broadcast_dims,
+        offsets
+    )
 end
 
 # -----------------------------------------------------------------------------------------------------------------------------------------
@@ -228,7 +252,7 @@ end
     end
 
     bc′ = Base.Broadcast.preprocess(shape(dest), bc)
-    
+
     # Performance may vary depending on whether `@inbounds` is placed outside the
     # for loop or not. (cf. https://github.com/JuliaLang/julia/issues/38086)
     @inbounds @simd for I in eachindex(dest)
@@ -241,9 +265,11 @@ end
 # -----------------------------------------------------------------------------------------------------------------------------------------
 
 # Custom preprocess(): Calculates which dimensions will need to be dropped in getindex()
-@inline Base.Broadcast.preprocess(dest::FieldShape, A::Field) = f_extrude(Base.Broadcast.broadcast_unalias(dest, A), dest)
+@inline Base.Broadcast.preprocess(dest::FieldShape, A::Field) =
+    f_extrude(Base.Broadcast.broadcast_unalias(dest, A), dest)
 
-@inline f_extrude(A::Field, dest::FieldShape) = Extruded(A, f_newindexer(A.dims, dest.dims, dest.axes), 0)
+@inline f_extrude(A::Field, dest::FieldShape) =
+    Extruded(A, f_newindexer(A.dims, dest.dims, dest.axes), 0)
 @inline f_extrude(A::Field{<:Any, <:Any, 0}, dest::FieldShape) = (A[],)
 
 # Idefault not needed... Extruded expects a third argument
@@ -252,33 +278,47 @@ end
     dim = dims[1]
     keep = f_newindexer(Base.tail(dims), b_dims, ax)
     return (get_dim_ind(b_dims, dim), keep...)
-end 
+end
 
 
 # -----------------------------------------------------------------------------------------------------------------------------------------
 
 # Custom getindex(): Drops additional dimensions to access array size
-@inline function Base.getindex(bc::Broadcasted{ArrayStyle{Field}}, I::Union{Integer,CartesianIndex})
+@inline function Base.getindex(
+    bc::Broadcasted{ArrayStyle{Field}},
+    I::Union{Integer, CartesianIndex}
+)
     @inbounds f_broadcast_getindex(bc, I)
 end
 
-Base.@propagate_inbounds function f_broadcast_getindex(bc::Broadcasted{<:Any,<:Any,typeof(ifelse),<:Any}, I)
+Base.@propagate_inbounds function f_broadcast_getindex(
+    bc::Broadcasted{<:Any, <:Any, typeof(ifelse), <:Any},
+    I
+)
     return f_getindex(bc.args[1], I) ? f_getindex(bc.args[2], I) : f_getindex(bc.args[3], I)
 end
 
-Base.@propagate_inbounds function f_broadcast_getindex(bc::Broadcasted{<:Any,<:Any,<:Any,<:Any}, I)
+Base.@propagate_inbounds function f_broadcast_getindex(
+    bc::Broadcasted{<:Any, <:Any, <:Any, <:Any},
+    I
+)
     args = f_getindex(bc.args, I)
     return Base.Broadcast._broadcast_getindex_evalf(bc.f, args...)
 end
 
 # Utilities for f_broadcast_getindex
-Base.@propagate_inbounds f_getindex(args::Tuple, I) = (f_broadcast_getindex(args[1], I), f_getindex(Base.tail(args), I)...)
-Base.@propagate_inbounds f_getindex(args::Tuple{Any}, I) = (f_broadcast_getindex(args[1], I),)
+Base.@propagate_inbounds f_getindex(args::Tuple, I) =
+    (f_broadcast_getindex(args[1], I), f_getindex(Base.tail(args), I)...)
+Base.@propagate_inbounds f_getindex(args::Tuple{Any}, I) =
+    (f_broadcast_getindex(args[1], I),)
 Base.@propagate_inbounds f_getindex(args::Tuple{}, I) = ()
 Base.@propagate_inbounds f_getindex(arg::Any, I) = f_broadcast_getindex(arg, I)
 
 # No changes to original
-Base.@propagate_inbounds f_broadcast_getindex(A::Union{Ref,AbstractArray{<:Any,0},Number}, I) = A[] # Scalar-likes can just ignore all indices
+Base.@propagate_inbounds f_broadcast_getindex(
+    A::Union{Ref, AbstractArray{<:Any, 0}, Number},
+    I
+) = A[] # Scalar-likes can just ignore all indices
 Base.@propagate_inbounds f_broadcast_getindex(::Ref{Type{T}}, I) where {T} = T
 # Tuples are statically known to be singleton or vector-like
 Base.@propagate_inbounds f_broadcast_getindex(A::Tuple{Any}, I) = A[1]

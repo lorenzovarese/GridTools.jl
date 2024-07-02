@@ -11,9 +11,27 @@ using MacroTools
 using OffsetArrays: IdOffsetRange
 using Debugger
 
-import Base.Broadcast: Extruded, Style, BroadcastStyle, ArrayStyle ,Broadcasted
+import Base.Broadcast: Extruded, Style, BroadcastStyle, ArrayStyle, Broadcasted
 
-export Dimension, DimensionKind, HORIZONTAL, VERTICAL, LOCAL, Field, Connectivity, FieldOffset, neighbor_sum, max_over, min_over, where, concat, @field_operator, slice, copyfield!, get_dim_name, get_dim_kind, get_dim_ind
+export Dimension,
+    DimensionKind,
+    HORIZONTAL,
+    VERTICAL,
+    LOCAL,
+    Field,
+    Connectivity,
+    FieldOffset,
+    neighbor_sum,
+    max_over,
+    min_over,
+    where,
+    concat,
+    @field_operator,
+    slice,
+    copyfield!,
+    get_dim_name,
+    get_dim_kind,
+    get_dim_ind
 
 const SKIP_NEIGHBOR_INDICATOR = -1 # TODO(tehrengruber): move from atlas submodule here
 
@@ -24,8 +42,8 @@ const SKIP_NEIGHBOR_INDICATOR = -1 # TODO(tehrengruber): move from atlas submodu
 
 abstract type DimensionKind end
 
-struct HORIZONTAL <: DimensionKind end 
-struct VERTICAL <: DimensionKind end 
+struct HORIZONTAL <: DimensionKind end
+struct VERTICAL <: DimensionKind end
 struct LOCAL <: DimensionKind end
 
 """
@@ -55,10 +73,11 @@ function Dimension(sym::Symbol, kind = HORIZONTAL)
 end
 
 Base.length(d::Dimension)::Int64 = 1
-Base.iterate(d::Dimension, state=1) = state==1 ? (d, state+1) : nothing
+Base.iterate(d::Dimension, state = 1) = state == 1 ? (d, state + 1) : nothing
 get_dim_name(d::Dimension) = string(typeof(d).parameters[1])[1:end-1]
 get_dim_kind(d::Dimension) = typeof(d).parameters[2]
-get_dim_ind(source::Tuple{Vararg{Dimension}}, ind::Dimension) = findfirst(x -> x == ind, source)
+get_dim_ind(source::Tuple{Vararg{Dimension}}, ind::Dimension) =
+    findfirst(x -> x == ind, source)
 
 # FieldOffset struct -------------------------------------------------------------
 
@@ -78,8 +97,16 @@ struct FieldOffset
     source::Dimension
     target::Tuple{Vararg{Dimension}}
 
-    function FieldOffset(name::String; source::Dimension, target::Union{Dimension, Tuple{Vararg{Dimension}}})::FieldOffset
-        if length(target) > 1 @assert all(get_dim_kind.(Base.tail(target)) .== LOCAL) ("All but the first dimension in an offset must be local dimensions.") end
+    function FieldOffset(
+        name::String;
+        source::Dimension,
+        target::Union{Dimension, Tuple{Vararg{Dimension}}}
+    )::FieldOffset
+        if length(target) > 1
+            @assert all(get_dim_kind.(Base.tail(target)) .== LOCAL) (
+                "All but the first dimension in an offset must be local dimensions."
+            )
+        end
         return new(name, source, Tuple(target))
     end
 end
@@ -130,7 +157,13 @@ julia> field(E2C)
 julia> field(E2C[1])
 ```
 """
-struct Field{B_Dim <: Tuple{Vararg{Dimension}}, T <: Union{AbstractFloat, Integer}, N, Dim <: NTuple{N, Dimension}, D <: AbstractArray{T,N}} <: AbstractArray{T,N}
+struct Field{
+    B_Dim <: Tuple{Vararg{Dimension}},
+    T <: Union{AbstractFloat, Integer},
+    N,
+    Dim <: NTuple{N, Dimension},
+    D <: AbstractArray{T, N}
+} <: AbstractArray{T, N}
     dims::Dim
     data::D
     broadcast_dims::B_Dim
@@ -138,32 +171,69 @@ struct Field{B_Dim <: Tuple{Vararg{Dimension}}, T <: Union{AbstractFloat, Intege
 end
 
 # TODO: check for #dimension at compile time and not runtime
-function Field(dims::Dim, data::D, broadcast_dims::B_Dim = dims; origin::Dict{<:Dimension, Int64} = Dict{Dimension, Int64}()) where {T <: Union{AbstractFloat, Integer}, N, B_Dim <: Tuple{Vararg{Dimension}}, Dim <: NTuple{N, Dimension}, D <: AbstractArray{T,N}}
-    if ndims(data) != 0 @assert length(dims) == ndims(data) end
+function Field(
+    dims::Dim,
+    data::D,
+    broadcast_dims::B_Dim = dims;
+    origin::Dict{<:Dimension, Int64} = Dict{Dimension, Int64}()
+) where {
+    T <: Union{AbstractFloat, Integer},
+    N,
+    B_Dim <: Tuple{Vararg{Dimension}},
+    Dim <: NTuple{N, Dimension},
+    D <: AbstractArray{T, N}
+}
+    if ndims(data) != 0
+        @assert length(dims) == ndims(data)
+    end
     offsets = Tuple([get(origin, dim, 0) for dim in dims])
     return Field(dims, data, broadcast_dims, offsets)
 end
 
-function Field(dim::Dimension, data::D, broadcast_dims::Union{Dimension,B_Dim} = dim; origin::Dict{<:Dimension, Int64} = Dict{Dimension, Int64}()) where {T <: Union{AbstractFloat, Integer}, N, B_Dim <: NTuple{N, Dimension}, D <: AbstractArray{T,N}}
-    if ndims(data) != 0 @assert ndims(data) == 1 end
+function Field(
+    dim::Dimension,
+    data::D,
+    broadcast_dims::Union{Dimension, B_Dim} = dim;
+    origin::Dict{<:Dimension, Int64} = Dict{Dimension, Int64}()
+) where {
+    T <: Union{AbstractFloat, Integer},
+    N,
+    B_Dim <: NTuple{N, Dimension},
+    D <: AbstractArray{T, N}
+}
+    if ndims(data) != 0
+        @assert ndims(data) == 1
+    end
     return Field(Tuple(dim), data, Tuple(broadcast_dims), origin = origin)
 end
 
-struct FieldOffsetTS{Name, Source <: Dimension, Target <: Union{Tuple{<:Dimension, <:Dimension}, Tuple{<:Dimension}}}
-end
+struct FieldOffsetTS{
+    Name,
+    Source <: Dimension,
+    Target <: Union{Tuple{<:Dimension, <:Dimension}, Tuple{<:Dimension}}
+} end
 
-to_type_stable_field_offset(offset::FieldOffset) = FieldOffsetTS{Symbol(offset.name), typeof(offset.source), Tuple{map(typeof,offset.target)...}}()
+to_type_stable_field_offset(offset::FieldOffset) = FieldOffsetTS{
+    Symbol(offset.name),
+    typeof(offset.source),
+    Tuple{map(typeof, offset.target)...}
+}()
 
-struct AllNeighbors
-end
+struct AllNeighbors end
 
 # TODO: move to embedded.jl
 function remap_position(
-        current_position::Tuple{Int64, Vararg{Int64}},
-        dims::Tuple{Dimension, Vararg{Dimension}},
-        offset::FieldOffsetTS{OffsetName, SourceDim, Tuple{TargetDim, TargetLocalDim}},
-        nb_ind::AllNeighbors,
-        conn) where {OffsetName, SourceDim <: Dimension, TargetDim <:Dimension, TargetLocalDim <: Dimension}  # TODO: restrict conn to type ::Connectivity
+    current_position::Tuple{Int64, Vararg{Int64}},
+    dims::Tuple{Dimension, Vararg{Dimension}},
+    offset::FieldOffsetTS{OffsetName, SourceDim, Tuple{TargetDim, TargetLocalDim}},
+    nb_ind::AllNeighbors,
+    conn
+) where {
+    OffsetName,
+    SourceDim <: Dimension,
+    TargetDim <: Dimension,
+    TargetLocalDim <: Dimension
+}  # TODO: restrict conn to type ::Connectivity
     if dims[1] == TargetDim()  # since we are mapping indices not field here the target source are flipped
         ind, actual_nb_ind, tail_position... = current_position
         _, local_dim, tail_dims... = dims
@@ -174,16 +244,23 @@ function remap_position(
         dim, tail_dims... = dims
     end
 
-    tail_position_exists, new_tail_position = remap_position(tail_position, tail_dims, offset, nb_ind, conn)
+    tail_position_exists, new_tail_position =
+        remap_position(tail_position, tail_dims, offset, nb_ind, conn)
     position_exists = (new_ind != SKIP_NEIGHBOR_INDICATOR) && tail_position_exists
     return position_exists, (new_ind, new_tail_position...)
 end
 function remap_position(
-        current_position::Tuple{Int64, Vararg{Int64}},
-        dims::Tuple{Dimension, Vararg{Dimension}},
-        offset::FieldOffsetTS{OffsetName, SourceDim, Tuple{TargetDim, TargetLocalDim}},
-        nb_ind::Int64,
-        conn) where {OffsetName, SourceDim <: Dimension, TargetDim <:Dimension, TargetLocalDim <: Dimension}  # TODO: restrict conn to type ::Connectivity
+    current_position::Tuple{Int64, Vararg{Int64}},
+    dims::Tuple{Dimension, Vararg{Dimension}},
+    offset::FieldOffsetTS{OffsetName, SourceDim, Tuple{TargetDim, TargetLocalDim}},
+    nb_ind::Int64,
+    conn
+) where {
+    OffsetName,
+    SourceDim <: Dimension,
+    TargetDim <: Dimension,
+    TargetLocalDim <: Dimension
+}  # TODO: restrict conn to type ::Connectivity
     if dims[1] == TargetDim()  # since we are mapping indices not field here the target source are flipped
         ind, tail_position... = current_position
         _, tail_dims... = dims
@@ -193,19 +270,32 @@ function remap_position(
         dim, tail_dims... = dims
     end
 
-    tail_position_exists, new_tail_position = remap_position(tail_position, tail_dims, offset, nb_ind, conn)
+    tail_position_exists, new_tail_position =
+        remap_position(tail_position, tail_dims, offset, nb_ind, conn)
     position_exists = (new_ind != SKIP_NEIGHBOR_INDICATOR) && tail_position_exists
     return position_exists, (new_ind, new_tail_position...)
 end
-remap_position(current_position::Tuple{}, dims::Tuple{}, offset::FieldOffsetTS, nb_ind::Union{Int64, AllNeighbors}, conn) = (true, ())
+remap_position(
+    current_position::Tuple{},
+    dims::Tuple{},
+    offset::FieldOffsetTS,
+    nb_ind::Union{Int64, AllNeighbors},
+    conn
+) = (true, ())
 
 
 function compute_remapped_field_info(
-        field_size::Tuple{Int64, Vararg{Int64}},
-        dims::Tuple{Dimension, Vararg{Dimension}},
-        offset::FieldOffsetTS{OffsetName, SourceDim, Tuple{TargetDim, TargetLocalDim}},
-        nb_ind::Union{Int64, AllNeighbors},
-        conn) where {OffsetName, SourceDim <: Dimension, TargetDim <:Dimension, TargetLocalDim <: Dimension}
+    field_size::Tuple{Int64, Vararg{Int64}},
+    dims::Tuple{Dimension, Vararg{Dimension}},
+    offset::FieldOffsetTS{OffsetName, SourceDim, Tuple{TargetDim, TargetLocalDim}},
+    nb_ind::Union{Int64, AllNeighbors},
+    conn
+) where {
+    OffsetName,
+    SourceDim <: Dimension,
+    TargetDim <: Dimension,
+    TargetLocalDim <: Dimension
+}
     length, tail_size... = field_size
     dim, tail_dims... = dims
     if dim == SourceDim()
@@ -223,7 +313,8 @@ function compute_remapped_field_info(
         new_size_part = (length,)
     end
 
-    new_tail_dims, new_tail_size = compute_remapped_field_info(tail_size, tail_dims, offset, nb_ind, conn)
+    new_tail_dims, new_tail_size =
+        compute_remapped_field_info(tail_size, tail_dims, offset, nb_ind, conn)
     new_dims = (new_dims_part..., new_tail_dims...)
     new_size = (new_size_part..., new_tail_size...)
     return new_dims, new_size
@@ -234,18 +325,28 @@ compute_remapped_field_info(
     offset::FieldOffsetTS,
     nb_ind::Union{Int64, AllNeighbors},
     conn
-)= ((), ())
+) = ((), ())
 
 
 function remap_broadcast_dims(
     broadcast_dims::Tuple{T, Vararg{Dimension}},
     offset::FieldOffsetTS{OffsetName, SourceDim, Tuple{TargetDim, TargetLocalDim}},
     nb_ind::Union{Int64, AllNeighbors}
-) where {T <: Dimension, OffsetName, SourceDim <: Dimension, TargetDim <:Dimension, TargetLocalDim <: Dimension}
+) where {
+    T <: Dimension,
+    OffsetName,
+    SourceDim <: Dimension,
+    TargetDim <: Dimension,
+    TargetLocalDim <: Dimension
+}
     dim, dim_tail... = broadcast_dims
     if dim == SourceDim()
         if nb_ind == AllNeighbors()
-            (TargetDim(), TargetLocalDim(), remap_broadcast_dims(dim_tail, offset, nb_ind)...)
+            (
+                TargetDim(),
+                TargetLocalDim(),
+                remap_broadcast_dims(dim_tail, offset, nb_ind)...
+            )
         else
             (TargetDim(), remap_broadcast_dims(dim_tail, offset, nb_ind)...)
         end
@@ -254,17 +355,28 @@ function remap_broadcast_dims(
     end
 end
 
-remap_broadcast_dims(broadcast_dims::Tuple{}, offset::FieldOffsetTS, nb_ind::Union{Int64, AllNeighbors}) = ()
+remap_broadcast_dims(
+    broadcast_dims::Tuple{},
+    offset::FieldOffsetTS,
+    nb_ind::Union{Int64, AllNeighbors}
+) = ()
 
 
 function remap_ts(
-        field::Field,
-        offset::FieldOffsetTS{OffsetName, SourceDim, Tuple{TargetDim, TargetLocalDim}},
-        nb_ind::Union{Int64, AllNeighbors} = AllNeighbors())::Field  where {OffsetName, SourceDim <: Dimension, TargetDim <:Dimension, TargetLocalDim <: Dimension}
+    field::Field,
+    offset::FieldOffsetTS{OffsetName, SourceDim, Tuple{TargetDim, TargetLocalDim}},
+    nb_ind::Union{Int64, AllNeighbors} = AllNeighbors()
+)::Field where {
+    OffsetName,
+    SourceDim <: Dimension,
+    TargetDim <: Dimension,
+    TargetLocalDim <: Dimension
+}
     conn = OFFSET_PROVIDER[string(OffsetName)]
 
     # compute new indices
-    out_field_dims, out_field_size = compute_remapped_field_info(size(field.data), field.dims, offset, nb_ind, conn)
+    out_field_dims, out_field_size =
+        compute_remapped_field_info(size(field.data), field.dims, offset, nb_ind, conn)
     #out_field = map(position -> begin
     #    neighbor_exists, new_position = remap_position(Tuple(position), out_field_dims, offset, nb_ind, conn)
     #    if neighbor_exists
@@ -275,34 +387,51 @@ function remap_ts(
     #end, CartesianIndices(map(len -> Base.OneTo(len), out_field_size)))
     out_field = zeros(eltype(field.data), out_field_size)
     for position in eachindex(IndexCartesian(), out_field)
-        neighbor_exists, new_position = remap_position(Tuple(position), out_field_dims, offset, nb_ind, conn)
+        neighbor_exists, new_position =
+            remap_position(Tuple(position), out_field_dims, offset, nb_ind, conn)
         if neighbor_exists
             out_field[position] = field.data[new_position...]
         end
     end
     # todo: origin
-    return Field(out_field_dims, out_field, remap_broadcast_dims(field.broadcast_dims, offset, nb_ind))
+    return Field(
+        out_field_dims,
+        out_field,
+        remap_broadcast_dims(field.broadcast_dims, offset, nb_ind)
+    )
 end
 
 (field::Field)(f_off::Tuple{FieldOffset, <:Integer})::Field = field(f_off...)
-function (field::Field)(f_off::FieldOffset, nb_ind::Union{Int64, AllNeighbors} = AllNeighbors())::Field
+function (field::Field)(
+    f_off::FieldOffset,
+    nb_ind::Union{Int64, AllNeighbors} = AllNeighbors()
+)::Field
     result = remap_ts(field, to_type_stable_field_offset(f_off), nb_ind)
     return result
 end
 
 # Field struct interfaces
-Base.axes(F::Field)::Tuple = map((i,j) -> i .+ j, axes(F.data), F.origin)
+Base.axes(F::Field)::Tuple = map((i, j) -> i .+ j, axes(F.data), F.origin)
 Base.size(F::Field)::Tuple = size(F.data)
-Base.convert(t::Type{T}, F::Field) where {T<:Number} = Field(F.dims, convert.(t, F.data), F.broadcast_dims)
-@propagate_inbounds function Base.getindex(F::Field{BD,T,N}, inds::Vararg{Int,N}) where {BD, T,N}
+Base.convert(t::Type{T}, F::Field) where {T <: Number} =
+    Field(F.dims, convert.(t, F.data), F.broadcast_dims)
+@propagate_inbounds function Base.getindex(
+    F::Field{BD, T, N},
+    inds::Vararg{Int, N}
+) where {BD, T, N}
     new_inds = inds .- F.origin
     return F.data[new_inds...]
 end
-@propagate_inbounds function Base.setindex!(F::Field{BD, T,N}, val, inds::Vararg{Int,N}) where {BD, T,N}
+@propagate_inbounds function Base.setindex!(
+    F::Field{BD, T, N},
+    val,
+    inds::Vararg{Int, N}
+) where {BD, T, N}
     new_inds = inds .- F.origin
     F.data[new_inds...] = val
 end
-Base.showarg(io::IO, @nospecialize(F::Field), toplevel) = print(io, eltype(F), " Field with dimensions ", get_dim_name.(F.broadcast_dims))
+Base.showarg(io::IO, @nospecialize(F::Field), toplevel) =
+    print(io, eltype(F), " Field with dimensions ", get_dim_name.(F.broadcast_dims))
 function slice(F::Field, inds...)::Field
     dim_ind = findall(x -> typeof(x) <: UnitRange{Int64}, inds)
     return Field(F.dims[dim_ind], view(F.data, inds...), F.broadcast_dims)
@@ -354,7 +483,7 @@ julia> copyfields!((a, b), (c, d))
 ```
 """
 function copyfield!(target::Tuple{Vararg{Field}}, source::Tuple{Vararg{Field}})
-    for i in 1:length(target)
+    for i = 1:length(target)
         target[i] .= source[i]
     end
 end
@@ -365,26 +494,56 @@ copyfield!(target, source) = target .= source
 OFFSET_PROVIDER::Union{Dict{String, <:Union{Connectivity, Dimension}}, Nothing} = nothing
 FIELD_OPERATORS::Dict{Symbol, PyObject} = Dict{Symbol, PyObject}()
 
-function (fo::FieldOp)(args...; offset_provider::Dict{String, <:Union{Connectivity, Dimension}} = Dict{String, Union{Connectivity, Dimension}}(), backend::String = "embedded", out = nothing, kwargs...)
+function (fo::FieldOp)(
+    args...;
+    offset_provider::Dict{String, <:Union{Connectivity, Dimension}} = Dict{
+        String,
+        Union{Connectivity, Dimension}
+    }(),
+    backend::String = "embedded",
+    out = nothing,
+    kwargs...
+)
 
     is_outermost_fo = isnothing(OFFSET_PROVIDER)
     if is_outermost_fo
         @assert !isnothing(out) "Must provide an out field."
         @assert typeof(out) <: Field || typeof(out) <: Tuple{Vararg{Field}} "Out argument is not a field."
         global OFFSET_PROVIDER = offset_provider
-        out = backend_execution(Val{Symbol(backend)}(), fo, args, kwargs, out, is_outermost_fo)
+        out = backend_execution(
+            Val{Symbol(backend)}(),
+            fo,
+            args,
+            kwargs,
+            out,
+            is_outermost_fo
+        )
         global OFFSET_PROVIDER = nothing
     else
         # TODO(tehrengruber): this breaks when fo execution fails and no cleanup is done. use try finally block
         #@assert isnothing(out)
         #@assert isempty(offset_provider)
-        out = backend_execution(Val{Symbol(backend)}(), fo, args, kwargs, out, is_outermost_fo)
+        out = backend_execution(
+            Val{Symbol(backend)}(),
+            fo,
+            args,
+            kwargs,
+            out,
+            is_outermost_fo
+        )
     end
 
     return out
 end
 
-function backend_execution(backend::Val{:embedded}, fo::FieldOp, args, kwargs, out, is_outermost_fo)
+function backend_execution(
+    backend::Val{:embedded},
+    fo::FieldOp,
+    args,
+    kwargs,
+    out,
+    is_outermost_fo
+)
     if is_outermost_fo
         copyfield!(out, fo.f(args...; kwargs...))
         return
@@ -393,15 +552,23 @@ function backend_execution(backend::Val{:embedded}, fo::FieldOp, args, kwargs, o
     end
 end
 
-function backend_execution(backend::Val{:py}, fo::FieldOp, args, kwargs, out, is_outermost_fo)
-    
+function backend_execution(
+    backend::Val{:py},
+    fo::FieldOp,
+    args,
+    kwargs,
+    out,
+    is_outermost_fo
+)
+
     if haskey(FIELD_OPERATORS, fo.name)
         f = FIELD_OPERATORS[fo.name]
     else
         f = py_field_operator(fo)
         FIELD_OPERATORS[fo.name] = f
     end
-    p_args, p_kwargs, p_out, p_offset_provider = py_args.((args, kwargs, out, GridTools.OFFSET_PROVIDER))
+    p_args, p_kwargs, p_out, p_offset_provider =
+        py_args.((args, kwargs, out, GridTools.OFFSET_PROVIDER))
     if is_outermost_fo
         f(p_args..., out = p_out, offset_provider = p_offset_provider; p_kwargs...)
         return
@@ -413,7 +580,10 @@ end
 function get_closure_vars(expr::Expr, current_vars::Dict)::Dict
 
     expr_def = splitdef(expr)
-    @assert all(typeof.(expr_def[:args]) .== Expr) && all(typeof.(expr_def[:kwargs]) .== Expr) ("Field operator parameters must be type annotated.")
+    @assert all(typeof.(expr_def[:args]) .== Expr) &&
+            all(typeof.(expr_def[:kwargs]) .== Expr) (
+        "Field operator parameters must be type annotated."
+    )
 
     local_vars = Set()
     closure_names = Set()
@@ -430,7 +600,9 @@ function get_closure_vars(expr::Expr, current_vars::Dict)::Dict
                 elseif name.head == :call
                     push!(local_vars, name.args[1])
                 else
-                    throw("For the following local variable: $name we dont provide support yet. Please report.") # TODO: verify
+                    throw(
+                        "For the following local variable: $name we dont provide support yet. Please report."
+                    ) # TODO: verify
                 end
             end
         end
@@ -439,7 +611,10 @@ function get_closure_vars(expr::Expr, current_vars::Dict)::Dict
 
     # catch all dimensions
     postwalk(expr.args[1]) do x
-        if typeof(x) == Symbol && x in keys(current_vars) && typeof(current_vars[x]) == DataType && current_vars[x] <: Dimension
+        if typeof(x) == Symbol &&
+           x in keys(current_vars) &&
+           typeof(current_vars[x]) == DataType &&
+           current_vars[x] <: Dimension
             push!(closure_names, x)
         end
     end
@@ -452,7 +627,7 @@ function get_closure_vars(expr::Expr, current_vars::Dict)::Dict
         elseif typeof(x) == Symbol && !(x in local_vars) && !(x in math_ops)
             push!(closure_names, x)
             return x
-        else 
+        else
             return x
         end
     end
@@ -466,13 +641,19 @@ function get_closure_vars(expr::Expr, current_vars::Dict)::Dict
 end
 
 macro module_vars()
-    return esc(quote
+    return esc(
+        quote
             # TODO(tehrengruber): for some reasons this was needed from some point on. cleanup
-            base_vars = Dict(name => Core.eval(Base, name) for name in [:Int64, :Int32, :Float32, :Float64])
-            module_vars = Dict(name => Core.eval(@__MODULE__, name) for name in names(@__MODULE__))
+            base_vars = Dict(
+                name => Core.eval(Base, name) for
+                name in [:Int64, :Int32, :Float32, :Float64]
+            )
+            module_vars =
+                Dict(name => Core.eval(@__MODULE__, name) for name in names(@__MODULE__))
             local_vars = Base.@locals
             merge(base_vars, module_vars, local_vars, GridTools.builtin_op)
-        end)
+        end
+    )
 end
 
 """
@@ -492,7 +673,16 @@ macro field_operator(expr::Expr)
     expr_dict[:name] = generate_unique_name(f_name)
     unique_expr = combinedef(expr_dict)
 
-    return Expr(:(=), esc(f_name), :(FieldOp(namify($(Expr(:quote, expr))), $(esc(unique_expr)), $(Expr(:quote, expr)), get_closure_vars($(Expr(:quote, expr)), @module_vars))))
+    return Expr(
+        :(=),
+        esc(f_name),
+        :(FieldOp(
+            namify($(Expr(:quote, expr))),
+            $(esc(unique_expr)),
+            $(Expr(:quote, expr)),
+            get_closure_vars($(Expr(:quote, expr)), @module_vars)
+        ))
+    )
 end
 
 generate_unique_name(name::Symbol, value::Integer = 0) = Symbol("$(name)ᐞ$(value)")

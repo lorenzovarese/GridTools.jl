@@ -9,10 +9,10 @@ const rpi = 2.0 * asin(1.0)
 const _deg2rad = 2.0 * rpi / 360.0
 
 const DIMENSION_TO_SIZE_ATTR = Dict{Dimension, Symbol}(
-        Vertex => :num_vertices,
-        Edge => :num_edges,
-        Cell => :num_cells,
-        K => :num_level
+    Vertex => :num_vertices,
+    Edge => :num_edges,
+    Cell => :num_cells,
+    K => :num_level
 )
 
 const SKIP_NEIGHBOR_INDICATOR = -1
@@ -20,12 +20,12 @@ const SKIP_NEIGHBOR_INDICATOR = -1
 function _atlas_connectivity_to_array(atlas_conn; out = nothing)
     if py"isinstance"(atlas_conn, atlas.BlockConnectivity)
         shape = (atlas_conn.rows, atlas_conn.cols)
-        out === nothing ? out = zeros(Integer,shape) : out
+        out === nothing ? out = zeros(Integer, shape) : out
         @assert size(out) == shape
 
-        for i in 1:atlas_conn.rows
-            for nb in 1:atlas_conn.cols
-                out[i, nb] = atlas_conn[i, nb]  
+        for i = 1:atlas_conn.rows
+            for nb = 1:atlas_conn.cols
+                out[i, nb] = atlas_conn[i, nb]
             end
         end
 
@@ -33,26 +33,26 @@ function _atlas_connectivity_to_array(atlas_conn; out = nothing)
     end
 
     shape = (atlas_conn.rows, atlas_conn.maxcols)
-    out === nothing ? out = zeros(Integer,shape) : out
+    out === nothing ? out = zeros(Integer, shape) : out
     @assert size(out) == shape
 
-    for i in 1:atlas_conn.rows
-        cols = atlas_conn.cols(i-1)
-        for nb in 1:cols
+    for i = 1:atlas_conn.rows
+        cols = atlas_conn.cols(i - 1)
+        for nb = 1:cols
             out[i, nb] = atlas_conn[i, nb] + 1 # for julia indexing
         end
         out[i, (cols+1):end] .= SKIP_NEIGHBOR_INDICATOR
     end
 
-    return out  
+    return out
 end
 
-function _build_atlas_mesh(config, grid; periodic_halos=py"None"o)
+function _build_atlas_mesh(config, grid; periodic_halos = py"None"o)
 
     mesh = atlas.StructuredMeshGenerator(config).generate(grid)
 
-    atlas.functionspace.EdgeColumns(mesh, halo=periodic_halos)
-    atlas.functionspace.NodeColumns(mesh, halo=periodic_halos)
+    atlas.functionspace.EdgeColumns(mesh, halo = periodic_halos)
+    atlas.functionspace.NodeColumns(mesh, halo = periodic_halos)
 
     atlas.build_node_to_edge_connectivity(mesh)
     atlas.build_node_to_cell_connectivity(mesh)
@@ -129,7 +129,12 @@ struct AtlasMesh
     _atlas_mesh::Any  # for debugging
 
 
-    function AtlasMesh(grid; num_level::Integer, radius=6371.22e03, config=nothing)::AtlasMesh
+    function AtlasMesh(
+        grid;
+        num_level::Integer,
+        radius = 6371.22e03,
+        config = nothing
+    )::AtlasMesh
         if isnothing(config)
             config = atlas.Config()
             config.__setitem__("triangulate", false)
@@ -138,7 +143,7 @@ struct AtlasMesh
             config.__setitem__("ghost_at_end", true)
         end
         # generate mesh from grid points    
-        mesh = _build_atlas_mesh(config, grid, periodic_halos=10)
+        mesh = _build_atlas_mesh(config, grid, periodic_halos = 10)
 
         num_cells = mesh.cells.size
         num_edges = mesh.edges.size
@@ -149,7 +154,8 @@ struct AtlasMesh
         edge_flags = mesh.edges.flags()
         cell_flags = mesh.cells.flags()
 
-        vertex_ghost_mask = Field((Vertex,), [x != 0 for x in (vertex_flags .&  atlas.Topology.GHOST)])
+        vertex_ghost_mask =
+            Field((Vertex,), [x != 0 for x in (vertex_flags .& atlas.Topology.GHOST)])
         nb_vertices_ghost = sum(vertex_ghost_mask)
         nb_vertices_noghost = num_vertices - nb_vertices_ghost
         @assert nb_vertices_noghost == sum(grid.nx)
@@ -195,11 +201,12 @@ struct AtlasMesh
         edges_per_node = size(v2e_np)[2]
         dual_face_orientation_np = zeros((num_vertices, edges_per_node))  # formerly known as "sign field"
 
-        @inline is_pole_edge(e::Integer, edge_flags::Array)::Bool = atlas.Topology.check(edge_flags[e], atlas.Topology.POLE)
+        @inline is_pole_edge(e::Integer, edge_flags::Array)::Bool =
+            atlas.Topology.check(edge_flags[e], atlas.Topology.POLE)
 
         num_pole_edges = 0
         pole_edge_mask_np = zeros(Bool, num_edges)
-        for e in 1:num_edges
+        for e = 1:num_edges
             if is_pole_edge(e, edge_flags)
                 num_pole_edges += 1
                 pole_edge_mask_np[e] = true
@@ -209,23 +216,23 @@ struct AtlasMesh
 
         pole_edges = zeros(Integer, num_pole_edges)
         inum_pole_edge = 0
-        for e in 1:num_edges
+        for e = 1:num_edges
             if is_pole_edge(e, edge_flags)
                 inum_pole_edge += 1
                 pole_edges[inum_pole_edge] = e
             end
         end
 
-        for v in 1:num_vertices
-            for e_nb in 1:edges_per_node
+        for v = 1:num_vertices
+            for e_nb = 1:edges_per_node
                 e = v2e_np[v, e_nb]
                 if e != SKIP_NEIGHBOR_INDICATOR
                     if v == e2v_np[e, 1]
                         dual_face_orientation_np[v, e_nb] = 1.0
-                        v2v_np[v, e_nb] = e2v_np[e,2]
+                        v2v_np[v, e_nb] = e2v_np[e, 2]
                     else
                         dual_face_orientation_np[v, e_nb] = -1.0
-                        v2v_np[v, e_nb] = e2v_np[e,1]
+                        v2v_np[v, e_nb] = e2v_np[e, 1]
                         if is_pole_edge(e, edge_flags)
                             dual_face_orientation_np[v, e_nb] = 1.0
                         end
@@ -239,9 +246,10 @@ struct AtlasMesh
         dual_face_orientation = Field((Vertex, V2EDim), dual_face_orientation_np)
 
         # dual normal
-        dual_face_normal_weighted_np = mesh.edges.field("dual_normals") .* radius .* _deg2rad
-        dual_face_normal_weighted_x = Field(Edge, dual_face_normal_weighted_np[:,1])
-        dual_face_normal_weighted_y = Field(Edge, dual_face_normal_weighted_np[:,2])
+        dual_face_normal_weighted_np =
+            mesh.edges.field("dual_normals") .* radius .* _deg2rad
+        dual_face_normal_weighted_x = Field(Edge, dual_face_normal_weighted_np[:, 1])
+        dual_face_normal_weighted_y = Field(Edge, dual_face_normal_weighted_np[:, 2])
 
         # dual volume
         vol_np = mesh.nodes.field("dual_volumes") .* _deg2rad^2 .* radius^2
@@ -280,7 +288,6 @@ struct AtlasMesh
             v2v,
             e2v,
             e2c,
-
             c2v_np,
             c2e_np,
             v2e_np,
@@ -311,22 +318,15 @@ struct AtlasMesh
             xyrad,
             xyarc,
             xyz,
-
             vol,
             vol_np,
-
             dual_face_normal_weighted_x,
             dual_face_normal_weighted_y,
             dual_face_normal_weighted_np,
-
             dual_face_orientation,
-
             dual_face_orientation_np,
-
             offset_provider,
-
             grid_description,  # string representation of the atlas grid instance
-
             mesh  # for debugging
         )
     end
@@ -351,7 +351,9 @@ function update_periodic_layers(mesh::AtlasMesh, field::Field)
     @assert get_dim_kind(horizontal_dimension) == HORIZONTAL
     remote_indices = mesh.remote_indices[horizontal_dimension]
 
-    periodic_indices = findall(remote_indices .!= collect(1:getproperty(mesh, DIMENSION_TO_SIZE_ATTR[horizontal_dimension])))
+    periodic_indices = findall(
+        remote_indices .!=
+        collect(1:getproperty(mesh, DIMENSION_TO_SIZE_ATTR[horizontal_dimension]))
+    )
     field[periodic_indices, :] .= field[remote_indices[periodic_indices], :]
 end
-
