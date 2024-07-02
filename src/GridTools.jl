@@ -89,6 +89,7 @@ Base.getindex(f_off::FieldOffset, ind::Integer) = f_off, ind
 
 # Field struct --------------------------------------------------------------------
 
+# TODO(tehrengruber): expand docstring for binary ops, e.g. +
 """
     Field(dims::Tuple, data::Array, broadcast_dims::Tuple; origin::Dic{Dimension, Int64})
 
@@ -156,26 +157,7 @@ to_type_stable_field_offset(offset::FieldOffset) = FieldOffsetTS{Symbol(offset.n
 struct AllNeighbors
 end
 
-function remap_position(
-        current_position::Tuple{Int64, Vararg{Int64}},
-        dims::Tuple{Dimension, Vararg{Dimension}},
-        offset::FieldOffsetTS{OffsetName, SourceDim, Tuple{TargetDim, TargetLocalDim}},
-        nb_ind::AllNeighbors,
-        conn) where {OffsetName, SourceDim <: Dimension, TargetDim <:Dimension, TargetLocalDim <: Dimension}  # TODO: restrict conn to type ::Connectivity
-    if dims[1] == TargetDim()  # since we are mapping indices not field here the target source are flipped
-        ind, actual_nb_ind, tail_position... = current_position
-        _, local_dim, tail_dims... = dims
-        #@assert local_dim isa Dimension && string(typeof(local_dim).parameters[1]) == (string(OffsetName)*"_") && typeof(local_dim).parameters[2] == LOCAL
-        new_ind = conn.data[ind, actual_nb_ind]
-    else
-        new_ind, tail_position... = current_position
-        dim, tail_dims... = dims
-    end
-
-    tail_position_exists, new_tail_position = remap_position(tail_position, tail_dims, offset, nb_ind, conn)
-    position_exists = (new_ind != SKIP_NEIGHBOR_INDICATOR) && tail_position_exists
-    return position_exists, (new_ind, new_tail_position...)
-end
+# TODO: move to embedded.jl
 function remap_position(
         current_position::Tuple{Int64, Vararg{Int64}},
         dims::Tuple{Dimension, Vararg{Dimension}},

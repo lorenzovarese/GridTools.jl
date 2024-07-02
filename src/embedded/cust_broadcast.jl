@@ -91,7 +91,7 @@ end
 end
 
 function promote_dims(dims_A::Tuple{Vararg{Dimension}}, dims_B::Tuple{Vararg{Dimension}})::Tuple{Vararg{Dimension}}
-
+    # TODO: copy documentation from GT4Py
     dims_list = [dims_A, dims_B]
 
     graph = Dict{Dimension, Set{Dimension}}()
