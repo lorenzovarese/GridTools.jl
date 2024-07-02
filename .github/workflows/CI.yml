@@ -52,3 +52,4 @@ jobs:
         with:
           name: dist-without-markdown
           path: /tmp/gt4py_cache
+          if: always()
