@@ -19,7 +19,7 @@ function _builtin_type_constructor_symbols(captured_vars, loc)::Tuple
             if name in fbuiltins.TYPE_BUILTIN_NAMES && value == py"getattr"(fbuiltins, name) # NOTE: Should be === . Doesnt work with pyobjects
     )
 
-    to_be_inserted = union(python_type_builtins, captured_type_builtins)
+    to_be_inserted = merge(python_type_builtins, captured_type_builtins)
 
     for (name, value) in to_be_inserted
         push!(result, 
@@ -67,13 +67,22 @@ function visit_function(args::Array, closure_vars::Dict)
         function_header = function_header.args[1]
     end
 
-    for param in Base.tail((Tuple(function_header.args)))
-        function_params = vcat(function_params, visit_types(param.args, closure_vars, inner_loc))
+    func_name, func_params_expr... = [function_header.args...]
+
+    # canonicalize keyword arguments
+    # TODO(tehrengruber): ensure this is tested properly
+    if length(func_params_expr) >= 1 && func_params_expr[1] isa Expr && func_params_expr[1].head == :parameters
+        func_kwparams_exprs = popfirst!(func_params_expr).args
+        push!(func_params_expr, func_kwparams_exprs...)
+    end
+
+    for param in func_params_expr
+        push!(function_params, visit_types(param.args, closure_vars, inner_loc))
     end
     
     return foast.FunctionDefinition(
-        id=string(function_header.args[1]),
-        params= function_params,
+        id=string(func_name),
+        params=function_params,
         body=function_body,
         closure_vars=closure_var_symbols,
         location=inner_loc
@@ -416,6 +425,8 @@ function from_type_hint(expr::Expr, closure_vars::Dict)
         
         dim = []
         (dims, dtype) = param_type[2:end]
+
+        # TODO: do some sanity checks here for example Field{Int64, Dims} will fail terribly
 
         for d in dims.args[2:end]
             @assert string(d) in keys(closure_vars)

@@ -1,6 +1,7 @@
 using Statistics
 
 # Setup ------------------------------------------------------------------------------------------------------------------------------
+include("mesh_definitions.jl")
 
 cell_values = Field(Cell, [1.0, 1.0, 2.0, 3.0, 5.0, 8.0])
 edge_to_cell_table = [
@@ -23,7 +24,10 @@ C2E_offset_provider = Connectivity(edge_to_cell_table, Edge, Cell, 2)
 
 offset_provider = Dict{String, Union{Connectivity, Dimension}}(
                    "E2C" => E2C_offset_provider,
-                   "C2E" => C2E_offset_provider
+                   "C2E" => C2E_offset_provider,
+                   # TODO(tehrengruber): cleanup
+                   "E2CDim" => E2C_offset_provider,
+                   "C2EDim" => C2E_offset_provider
                 )
 
 x = Field((Cell, K), reshape(collect(-3.0:2.0), (3, 2)))
@@ -94,7 +98,7 @@ end
     end
 
     fo_remapping(cell_values, offset_provider=offset_provider, out = out)
-    @test  out == result_offset_call
+    @test out == result_offset_call
 end
 
 
@@ -169,5 +173,5 @@ end
               1.0 1.0 1.0]
     result = Field((Cell, K), result_data)
 
-    @test concat(x, y).data == result
+    @test concat(a, b).data == result
 end

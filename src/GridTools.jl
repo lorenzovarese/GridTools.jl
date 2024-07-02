@@ -234,17 +234,6 @@ compute_remapped_field_info(
     conn
 )= ((), ())
 
-function remap_ts(
-        field::Field,
-        offset::FieldOffsetTS{OffsetName, SourceDim, Tuple{TargetDim}},
-        nb_ind::Int64)::Field where {OffsetName, SourceDim <: Dimension, TargetDim <:Dimension}
-    conn = OFFSET_PROVIDER[string(OffsetName)]
-
-    new_offsets = Dict(field.dims[i] => field.origin[i] for i in 1:length(field.dims))
-    new_offsets[conn] = nb_ind
-    return Field(field.dims, field.data, field.broadcast_dims, origin = new_offsets)
-end
-
 
 function remap_broadcast_dims(
     broadcast_dims::Tuple{T, Vararg{Dimension}},
@@ -282,7 +271,7 @@ function remap_ts(
     #        eltype(field.data)(0)
     #    end
     #end, CartesianIndices(map(len -> Base.OneTo(len), out_field_size)))
-    out_field = Array{eltype(field.data)}(undef, out_field_size)
+    out_field = zeros(eltype(field.data), out_field_size)
     for position in eachindex(IndexCartesian(), out_field)
         neighbor_exists, new_position = remap_position(Tuple(position), out_field_dims, offset, nb_ind, conn)
         if neighbor_exists
@@ -371,10 +360,10 @@ copyfield!(target, source) = target .= source
 
 # Field operator functionalities ------------------------------------------------------------
 
-OFFSET_PROVIDER::Union{Dict{String, Union{Connectivity, Dimension}}, Nothing} = nothing
+OFFSET_PROVIDER::Union{Dict{String, <:Union{Connectivity, Dimension}}, Nothing} = nothing
 FIELD_OPERATORS::Dict{Symbol, PyObject} = Dict{Symbol, PyObject}()
 
-function (fo::FieldOp)(args...; offset_provider::Dict{String, Union{Connectivity, Dimension}} = Dict{String, Union{Connectivity, Dimension}}(), backend::String = "embedded", out = nothing, kwargs...)
+function (fo::FieldOp)(args...; offset_provider::Dict{String, <:Union{Connectivity, Dimension}} = Dict{String, Union{Connectivity, Dimension}}(), backend::String = "embedded", out = nothing, kwargs...)
 
     is_outermost_fo = isnothing(OFFSET_PROVIDER)
     if is_outermost_fo
@@ -476,12 +465,13 @@ end
 
 macro module_vars()
     return esc(quote
+            # TODO(tehrengruber): for some reasons this was needed from some point on. cleanup
+            base_vars = Dict(name => Core.eval(Base, name) for name in [:Int64, :Int32, :Float32, :Float64])
             module_vars = Dict(name => Core.eval(@__MODULE__, name) for name in names(@__MODULE__))
             local_vars = Base.@locals
-            merge(module_vars, local_vars, GridTools.builtin_op)
+            merge(base_vars, module_vars, local_vars, GridTools.builtin_op)
         end)
 end
-
 
 """
     @field_operator
@@ -499,7 +489,7 @@ macro field_operator(expr::Expr)
     expr_dict = splitdef(expr)
     expr_dict[:name] = generate_unique_name(f_name)
     unique_expr = combinedef(expr_dict)
-    
+
     return Expr(:(=), esc(f_name), :(FieldOp(namify($(Expr(:quote, expr))), $(esc(unique_expr)), $(Expr(:quote, expr)), get_closure_vars($(Expr(:quote, expr)), @module_vars))))
 end
 

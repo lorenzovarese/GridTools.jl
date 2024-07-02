@@ -126,7 +126,10 @@ CLOSURE_VARS::Dict = Dict()
 
 # Methods -----------------------------------------------------------------------------------
 
-function py_field_operator(fo, backend = py_backends["gpu"], grid_type = py"None"o, operator_attributes = Dict())
+function py_field_operator(fo, backend = Nothing, grid_type = py"None"o, operator_attributes = Dict())
+    if backend == Nothing
+        backend = py_backends["gpu"]
+    end
 
     foast_definition_node, closure_vars = jast_to_foast(fo.expr, fo.closure_vars)
     loc = foast_definition_node.location
@@ -146,12 +149,12 @@ function py_field_operator(fo, backend = py_backends["gpu"], grid_type = py"None
     foast_node = FieldOperatorTypeDeduction.apply(untyped_foast_node)
 
     return FieldOperater(
-            foast_node=foast_node,
-            closure_vars=closure_vars,
-            definition=py"None"o,
-            backend=backend,
-            grid_type=grid_type,
-        )
+        foast_node=foast_node,
+        closure_vars=closure_vars,
+        definition=py"None"o,
+        backend=backend,
+        grid_type=grid_type,
+    )
 end
 
 function jast_to_foast(expr::Expr, closure_vars::Dict)
@@ -187,7 +190,7 @@ function postprocess_definition(foast_node, closure_vars, annotations)
 end
 
 py_args(args::Union{Base.Pairs, Dict}) = Dict(i.first => convert_type(i.second) for i in args)
-py_args(args::Tuple) = [map(convert_type, args)...]
+py_args(args::Tuple) = [convert_type(arg) for arg in args]
 py_args(arg) = convert_type(arg)
 py_args(n::Nothing) = nothing
 
@@ -204,6 +207,8 @@ function convert_type(a::Field)
         new_data = np.asarray(a.data)
         @warn "Dtype of the Field: $a is not concrete. Data must be copied to Python which may affect performance. Try using dtypes <: Array."
     end
+    println(new_data)
+    println(typeof(new_data))
 
     offset = Dict(convert_type(dim) => a.origin[i] for (i, dim) in enumerate(a.dims))
 
