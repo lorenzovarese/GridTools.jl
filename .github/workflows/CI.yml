@@ -34,9 +34,10 @@ jobs:
           python-version: ${{ matrix.python_version }}  # TODO(tehrengruber): cache?
       - name: Install GT4Py
         run: |
-          git clone https://github.com/GridTools/gt4py.git
+          #git clone https://github.com/GridTools/gt4py.git
+          git clone --branch fix_python_interp_path_in_cmake git@github.com:tehrengruber/gt4py.git
           cd gt4py
-          git checkout 91307b10e2ca1edb76a72cd8a3bebdd66898da60 # TODO(tehrengruber): remove
+          #git checkout 91307b10e2ca1edb76a72cd8a3bebdd66898da60 # TODO(tehrengruber): remove
           pip install -r requirements-dev.txt
           pip install .
       - uses: julia-actions/setup-julia@v1

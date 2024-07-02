@@ -27,7 +27,7 @@ const ClosureVarTypeDeduction = PyNULL()
 const DeadClosureVarElimination = PyNULL()
 const UnpackedAssignPass = PyNULL()
 const FieldOperatorTypeDeduction = PyNULL()
-const FieldOperater = PyNULL()
+const FieldOperator = PyNULL()
 const roundtrip = PyNULL()
 const gtfn_cpu = PyNULL()
 const cmake = PyNULL()
@@ -59,7 +59,7 @@ function __init__()
     copy!(DeadClosureVarElimination, pyimport("gt4py.next.ffront.foast_passes.dead_closure_var_elimination").DeadClosureVarElimination)
     copy!(UnpackedAssignPass, pyimport("gt4py.next.ffront.foast_passes.iterable_unpack").UnpackedAssignPass)
     copy!(FieldOperatorTypeDeduction, pyimport("gt4py.next.ffront.foast_passes.type_deduction").FieldOperatorTypeDeduction)
-    copy!(FieldOperater, pyimport("gt4py.next.ffront.decorator").FieldOperator)
+    copy!(FieldOperator, pyimport("gt4py.next.ffront.decorator").FieldOperator)
     copy!(roundtrip, pyimport("gt4py.next.program_processors.runners.roundtrip"))
     copy!(gtfn_cpu, pyimport("gt4py.next.program_processors.runners.gtfn"))
     copy!(cmake, pyimport("gt4py.next.otf.compilation.build_systems.cmake"))
@@ -148,7 +148,7 @@ function py_field_operator(fo, backend = Nothing, grid_type = py"None"o, operato
 
     foast_node = FieldOperatorTypeDeduction.apply(untyped_foast_node)
 
-    return FieldOperater(
+    return FieldOperator(
         foast_node=foast_node,
         closure_vars=closure_vars,
         definition=py"None"o,
