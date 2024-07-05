@@ -35,10 +35,9 @@ export Dimension,
 
 const SKIP_NEIGHBOR_INDICATOR = -1 # TODO(tehrengruber): move from atlas submodule here
 
-
-# Lib ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-# Dimension --------------------------------------------------------------------
+# ========================================
+# =============== Dimension ==============
+# ========================================
 
 abstract type DimensionKind end
 
@@ -47,46 +46,73 @@ struct VERTICAL <: DimensionKind end
 struct LOCAL <: DimensionKind end
 
 """
-    struct Dimension
+    struct Dimension{name, kind <: DimensionKind}
 
+Create a new `Dimension` with a specified name and kind. This struct is parameterized to allow for flexible 
+representation of various dimensions, typically used in grid and spatial data structures.
 
-Create a new Dimension. Per default a dimension is horizontal.
+## Type Parameters
+- `name`: A symbol representing the name of the dimension, uniquely identifying it.
+- `kind`: A subtype of `DimensionKind` which defaults to `HORIZONTAL` if not specified, indicating the 
+          dimension's orientation or scope (e.g., `HORIZONTAL`, `VERTICAL`, `LOCAL`).
 
-# Examples
-```julia-repl
-julia> Cell_ = Dimension(:Cell_)
+By default, dimensions are horizontal unless otherwise specified. This can be customized by providing 
+a specific kind during creation.
+
+## Examples
+```julia
+julia> Cell_ = Dimension(:Cell_)  # Defaults to horizontal
 julia> Cell = Cell_()
-```
 
-In order to create a local dimension one needs to adhere to a particular naming scheme as shown below:
-
-# Examples
-```julia-repl
-julia> V2EDim_ = Dimension(:V2E_, LOCAL)
+julia> V2EDim_ = Dimension(:V2E_, LOCAL)  # Explicitly specifying local kind
 julia> V2EDim = V2EDim_()
 ```
 """
 struct Dimension{name, kind <: DimensionKind} end
 
+# Create a new `Dimension` instance with a specified symbol and kind.
 function Dimension(sym::Symbol, kind = HORIZONTAL)
     return Dimension{sym, kind}
 end
 
+# Define the length of a Dimension object as always 1. This treats Dimension as a scalar entity.
 Base.length(d::Dimension)::Int64 = 1
+
+# Enable iteration over a Dimension object. Allows a Dimension to be used once in a loop.
 Base.iterate(d::Dimension, state = 1) = state == 1 ? (d, state + 1) : nothing
+
+# Retrieve the name of the Dimension, removing the trailing underscore.
 get_dim_name(d::Dimension) = string(typeof(d).parameters[1])[1:end-1]
+
+# Obtain the kind of the Dimension, which indicates its type (e.g., HORIZONTAL, VERTICAL, LOCAL).
 get_dim_kind(d::Dimension) = typeof(d).parameters[2]
+
+# Find the first index of a specific Dimension object within a tuple of Dimensions.
 get_dim_ind(source::Tuple{Vararg{Dimension}}, ind::Dimension) =
     findfirst(x -> x == ind, source)
 
-# FieldOffset struct -------------------------------------------------------------
+# ========================================
+# ============= FieldOffset ==============
+# ========================================
 
 """
-    FieldOffset(name::String, source::Tuple, target::Tuple)
+    FieldOffset(name::String, source::Dimension, target::Union{Dimension, Tuple{Vararg{Dimension}}})
 
-You can transform fields (or tuples of fields) over one domain to another domain by using the call operator of the source field with a field offset as argument. This transform uses the connectivity between the source and target domains to find the values of adjacent mesh elements.
+The `FieldOffset` struct represents a transformation that can be applied to fields (or tuples of fields) over 
+one domain to another domain. This transformation leverages the connectivity between the source and target domains 
+to find the values of adjacent mesh elements.
 
-# Examples
+## Arguments
+- `name::String`: A name for the field offset.
+- `source::Dimension`: The source dimension from which the transformation originates.
+- `target::Union{Dimension, Tuple{Vararg{Dimension}}}`: The target dimension or a tuple of dimensions to which the 
+   transformation is applied. If `target` is a tuple with more than one dimension, all but the first dimension must 
+   be local dimensions.
+
+## Returns
+- A `FieldOffset` instance that represents the transformation from the source dimension to the target dimension(s).
+
+## Examples
 ```julia-repl
 julia> V2E = FieldOffset("V2E", source=Edge, target=(Vertex, V2EDim))
 FieldOffset("V2E", Dimension{:Edge_, HORIZONTAL}(), (Dimension{:Vertex_, HORIZONTAL}(), Dimension{:V2E_, LOCAL}()))
@@ -111,19 +137,37 @@ struct FieldOffset
     end
 end
 
+# Returns a tuple of the FieldOffset instance and the provided index.
 Base.getindex(f_off::FieldOffset, ind::Integer) = f_off, ind
 
-
-# Field struct --------------------------------------------------------------------
+# ========================================
+# ================ Field =================
+# ========================================
 
 # TODO(tehrengruber): expand docstring for binary ops, e.g. +
 """
-    Field(dims::Tuple, data::Array, broadcast_dims::Tuple; origin::Dic{Dimension, Int64})
+    Field{B_Dim, T, N, Dim, D} <: AbstractArray{T, N}
 
-Fields store data as a multi-dimensional array, and are defined over a set of named dimensions. 
+Represents a multidimensional data structure defined over a set of named dimensions (`dims`), capable of storing 
+numeric data (`data`). This structure supports advanced indexing and data manipulation features, making it 
+suitable for complex data analysis and computational science tasks.
 
-# Examples
-```julia-repl
+## Fields
+- `dims::Dim`: Tuple of `Dimension` objects defining the axes of the field.
+- `data::D`: The multi-dimensional array storing the actual data.
+- `broadcast_dims::B_Dim`: Tuple of dimensions used for broadcasting operations to align with Julia's broadcasting behavior.
+- `origin::NTuple{N, Int64}`: Specifies the index origin for each dimension, allowing for offset indexing.
+
+## Parameters
+- `dims`: A tuple specifying the dimensions of the field.
+- `data`: An array containing the field's data.
+- `broadcast_dims` (optional): Dimensions used for broadcasting; defaults to `dims` if not specified.
+- `origin`: A dictionary mapping dimensions to their respective origins for indexing, allowing shifting 
+   of the data's logical view.
+
+## Examples
+Create a simple field:
+```julia
 julia> new_field = Field((Cell, K), fill(1.0, (3,2)))
 3×2 Float64 Field with dimensions ("Cell", "K") with indices 1:3×1:2:
  1.0  1.0
@@ -131,10 +175,9 @@ julia> new_field = Field((Cell, K), fill(1.0, (3,2)))
  1.0  1.0
 ```
 
+Offset a dimension:
 Each dimension can be offset by a certain index. This changes the index-range of the Field.
-
-# Examples
-```julia-repl
+```julia
 julia> new_field = Field((Cell, K), fill(1.0, (3,2)), origin = Dict(K => 1))
 3×2 Float64 Field with dimensions ("Cell", "K") with indices 1:3×2:3:
  1.0  1.0
@@ -142,14 +185,16 @@ julia> new_field = Field((Cell, K), fill(1.0, (3,2)), origin = Dict(K => 1))
  1.0  1.0
 ```
 
-Fields also have a call operator. You can transform fields (or tuples of fields) over one domain to another domain by using the call operator of the source field with a field offset as argument.
-As an example, you can use the field offset E2C below to transform a field over cells to a field over edges using edge-to-cell connectivities. The FieldOffset can take an index as argument which restricts the output dimension of the transform.
+Fields also have a call operator. You can transform fields (or tuples of fields) over one domain to another 
+domain by using the call operator of the source field with a field offset as argument.
+As an example, you can use the field offset E2C below to transform a field over cells to a field over edges 
+using edge-to-cell connectivities. The FieldOffset can take an index as argument which restricts the output 
+dimension of the transform.
 
 The call itself must happen in a field_operator since it needs the functionality of an offset_provider.
 
-
-# Examples
-```julia-repl
+## Examples
+```julia
 julia> E2C = FieldOffset("E2C", source=Cell, target=(Edge, E2CDim))
 julia> field = Field(Cell, ones(5))
 
@@ -171,6 +216,7 @@ struct Field{
 end
 
 # TODO: check for #dimension at compile time and not runtime
+# Ensure the number of dimensions in 'dims' matches the number of dimensions in 'data'
 function Field(
     dims::Dim,
     data::D,
@@ -190,6 +236,7 @@ function Field(
     return Field(dims, data, broadcast_dims, offsets)
 end
 
+# Verify that 'data' is one-dimensional if it is not empty
 function Field(
     dim::Dimension,
     data::D,
@@ -207,21 +254,80 @@ function Field(
     return Field(Tuple(dim), data, Tuple(broadcast_dims), origin = origin)
 end
 
+# A type-stable struct representing a transformation between source and target dimensions.
 struct FieldOffsetTS{
     Name,
     Source <: Dimension,
     Target <: Union{Tuple{<:Dimension, <:Dimension}, Tuple{<:Dimension}}
 } end
 
+"""
+    to_type_stable_field_offset(offset::FieldOffset) -> FieldOffsetTS
+
+Converts a `FieldOffset` instance to a type-stable `FieldOffsetTS` instance.
+
+## Arguments
+- `offset::FieldOffset`: The `FieldOffset` instance to be converted.
+
+## Returns
+- A `FieldOffsetTS` instance with type parameters derived from the `offset`.
+"""
 to_type_stable_field_offset(offset::FieldOffset) = FieldOffsetTS{
     Symbol(offset.name),
     typeof(offset.source),
     Tuple{map(typeof, offset.target)...}
 }()
 
+"""
+    struct AllNeighbors
+
+The `AllNeighbors` struct is used to indicate that all neighboring positions should be considered 
+in a remapping operation. This can be useful in functions where a complete traversal or interaction 
+with all neighboring elements is required.
+
+## Examples
+```julia
+julia> nb_ind = AllNeighbors()
+AllNeighbors()
+```
+"""
 struct AllNeighbors end
 
-# TODO: move to embedded.jl
+"""
+    remap_position(current_position::Tuple{Int64, Vararg{Int64}},
+                   dims::Tuple{Dimension, Vararg{Dimension}},
+                   offset::FieldOffsetTS{OffsetName, SourceDim, Tuple{TargetDim, TargetLocalDim}},
+                   nb_ind::AllNeighbors,
+                   conn) -> Tuple{Bool, Tuple{Int64, Vararg{Int64}}}
+
+Remaps the given `current_position` from the `SourceDim` to the `TargetDim` using the provided `offset` and connectivity information. This function recursively processes the dimensions and their respective positions.
+
+## Arguments
+- `current_position::Tuple{Int64, Vararg{Int64}}`: The current position as a tuple of indices.
+- `dims::Tuple{Dimension, Vararg{Dimension}}`: The dimensions corresponding to the current position.
+- `offset::FieldOffsetTS{OffsetName, SourceDim, Tuple{TargetDim, TargetLocalDim}}`: The field offset indicating the transformation from the source dimension to the target dimensions.
+- `nb_ind::AllNeighbors`: An indicator to consider all neighboring positions.
+- `conn`: The connectivity information used for remapping. This should be of a type that provides connectivity data (e.g., `conn.data`).
+
+## Returns
+- A tuple `(position_exists::Bool, new_position::Tuple{Int64, Vararg{Int64}})`, where `position_exists` indicates if the remapped position is valid and `new_position` is the remapped position tuple.
+
+## Examples
+```julia
+julia> current_position = (1, 2, 3)
+julia> dims = (Dimension{:Edge_, HORIZONTAL}(), Dimension{:Vertex_, HORIZONTAL}(), Dimension{:V2E_, LOCAL}())
+julia> offset = FieldOffsetTS{:V2E, Dimension{:Edge_, HORIZONTAL}, Tuple{Dimension{:Vertex_, HORIZONTAL}, Dimension{:V2E_, LOCAL}}}()
+julia> nb_ind = AllNeighbors()
+julia> conn = Connectivity([ [1,2,3], [4,5,6] ])  # Assuming `Connectivity` is a struct with appropriate `data`
+julia> remap_position(current_position, dims, offset, nb_ind, conn)
+(true, (new_index, new_tail_position...))
+```
+
+## Implementation Details
+- The function checks if the first dimension in dims matches the TargetDim. If it matches, it performs a lookup in conn using the index and neighbor index from current_position.
+- If the first dimension does not match the TargetDim, it processes the current position and dimensions recursively.
+- The function ensures that if new_ind is not a SKIP_NEIGHBOR_INDICATOR and the tail position exists, the remapped position is considered valid.
+""" # TODO: move to embedded.jl
 function remap_position(
     current_position::Tuple{Int64, Vararg{Int64}},
     dims::Tuple{Dimension, Vararg{Dimension}},
@@ -249,6 +355,8 @@ function remap_position(
     position_exists = (new_ind != SKIP_NEIGHBOR_INDICATOR) && tail_position_exists
     return position_exists, (new_ind, new_tail_position...)
 end
+
+# Remaps the position with a neighbor index specified as an integer.
 function remap_position(
     current_position::Tuple{Int64, Vararg{Int64}},
     dims::Tuple{Dimension, Vararg{Dimension}},
@@ -275,6 +383,8 @@ function remap_position(
     position_exists = (new_ind != SKIP_NEIGHBOR_INDICATOR) && tail_position_exists
     return position_exists, (new_ind, new_tail_position...)
 end
+
+# Override for handling the base case where `current_position` and `dims` are empty.
 remap_position(
     current_position::Tuple{},
     dims::Tuple{},
@@ -282,7 +392,6 @@ remap_position(
     nb_ind::Union{Int64, AllNeighbors},
     conn
 ) = (true, ())
-
 
 function compute_remapped_field_info(
     field_size::Tuple{Int64, Vararg{Int64}},
@@ -319,6 +428,7 @@ function compute_remapped_field_info(
     new_size = (new_size_part..., new_tail_size...)
     return new_dims, new_size
 end
+
 compute_remapped_field_info(
     field_size::Tuple{},
     dims::Tuple{},
@@ -326,7 +436,6 @@ compute_remapped_field_info(
     nb_ind::Union{Int64, AllNeighbors},
     conn
 ) = ((), ())
-
 
 function remap_broadcast_dims(
     broadcast_dims::Tuple{T, Vararg{Dimension}},
@@ -360,7 +469,6 @@ remap_broadcast_dims(
     offset::FieldOffsetTS,
     nb_ind::Union{Int64, AllNeighbors}
 ) = ()
-
 
 function remap_ts(
     field::Field,
@@ -437,13 +545,15 @@ function slice(F::Field, inds...)::Field
     return Field(F.dims[dim_ind], view(F.data, inds...), F.broadcast_dims)
 end
 
-# Connectivity struct ------------------------------------------------------------
+# ========================================
+# ============= Connectivity =============
+# ========================================
 
 """
     Connectivity(data::Array, source::Tuple, target::Tuple, dims::Int)
 
 # Examples
-```julia-repl
+```julia
 julia> new_connectivity = Connectivity(fill(1, (3,2)), Cell, Edge, 2)
 Connectivity(Integer[1 1; 1 1; 1 1], Dimension{:Cell_, HORIZONTAL}(), Dimension{:Edge_, HORIZONTAL}(), 2
 ```
@@ -455,7 +565,9 @@ struct Connectivity
     dims::Integer
 end
 
-# Field operator ----------------------------------------------------------------------
+# ========================================
+# ============ Field Operator ============
+# ========================================
 
 struct FieldOp
     name::Symbol
@@ -560,7 +672,6 @@ function backend_execution(
     out,
     is_outermost_fo
 )
-
     if haskey(FIELD_OPERATORS, fo.name)
         f = FIELD_OPERATORS[fo.name]
     else
@@ -578,7 +689,6 @@ function backend_execution(
 end
 
 function get_closure_vars(expr::Expr, current_vars::Dict)::Dict
-
     expr_def = splitdef(expr)
     @assert all(typeof.(expr_def[:args]) .== Expr) &&
             all(typeof.(expr_def[:kwargs]) .== Expr) (
@@ -687,4 +797,4 @@ end
 
 generate_unique_name(name::Symbol, value::Integer = 0) = Symbol("$(name)ᐞ$(value)")
 
-end
+end # End GridTools module
